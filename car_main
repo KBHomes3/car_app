@@ -1,0 +1,51 @@
+package main
+import (
+"fmt"
+"io/ioutil"
+"net/http"
+)
+func main() {
+http.HandleFunc("/khakiauto/api/v1/preview", CheckUrl)
+http.ListenAndServe(":8881", nil)
+}
+func CheckUrl(w http.ResponseWriter, r *http.Request) {
+// Get the siteurl parameter
+query := r.URL.Query()
+siteurl, siteurlok := query["siteurl"]
+if !siteurlok || len(siteurl) < 1 || siteurl == nil {
+http.Error(w, "KhakiAuto couldn't process that request!", 400)
+return
+
+}
+resp, err := http.Get(siteurl[0])
+if err != nil {
+// Make sure the calling front-end code knows there was an error
+http.Error(w, fmt.Sprintf(err.Error()), 400)
+return
+}
+// If we got this far we must be good.... return the site content
+// so it can do stuff
+if resp.StatusCode == http.StatusOK {
+defer resp.Body.Close()
+bodyBytes, err := ioutil.ReadAll(resp.Body)
+if err != nil {
+// Make sure the calling front-end code knows there was an error
+http.Error(w, err.Error(), 400)
+return
+}
+bodyString := string(bodyBytes)
+// If we were successful we should output the body
+// because the frontend wants to preview it in a frame
+// We can simply re-use this function to output the site content
+// right into a frame on the web page.
+fmt.Fprintf(w, bodyString)
+} else {
+// No one knows why requests fail sometimes, but frontend will figure
+// it out. Send request details as a string and front end will parse
+// somehow using their magic. They can tell its a special error because
+// [OMG] is in the string, and it can be matched with a regular
+// expression according to a book I read. Then, frontend can do
+// something different.
+http.Error(w, fmt.Sprintf("[OMG] %#v", r), 400)
+}
+}
